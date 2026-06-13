@@ -1,5 +1,4 @@
 import pytest
-import requests
 from unittest.mock import MagicMock, patch
 from nodes.scrape_listings import scrape_listings, _parse_listings
 
@@ -88,7 +87,7 @@ class TestScrapeListings:
 
         session = MagicMock()
         session.get.side_effect = [
-            requests.RequestException("timeout"),
+            IOError("timeout"),
             resp_ok,
         ]
 
@@ -100,7 +99,7 @@ class TestScrapeListings:
 
     def test_raises_after_all_retries_exhausted(self):
         session = MagicMock()
-        session.get.side_effect = requests.RequestException("always fails")
+        session.get.side_effect = IOError("always fails")
 
         with patch("nodes.scrape_listings.time.sleep"):
             with pytest.raises(RuntimeError, match="Scraping failed"):

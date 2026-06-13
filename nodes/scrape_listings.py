@@ -28,29 +28,19 @@ import time
 import random
 from typing import Optional
 
-import requests
+from curl_cffi.requests import Session
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://www.pararius.com"
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-}
 
-
-def _fetch_html(search_url: str, session: requests.Session, timeout: int = 15) -> str:
+def _fetch_html(search_url: str, session, timeout: int = 15) -> str:
     """Return the raw HTML of the search page."""
     jitter = random.uniform(0.5, 1.5)
     time.sleep(jitter)
-    resp = session.get(search_url, headers=HEADERS, timeout=timeout)
+    resp = session.get(search_url, timeout=timeout)
     resp.raise_for_status()
     return resp.text
 
@@ -114,7 +104,7 @@ def scrape_listings(
     search_url: str,
     max_retries: int = 3,
     backoff_base: float = 2.0,
-    session: Optional[requests.Session] = None,
+    session: Optional[Session] = None,
 ) -> list:
     """Scrape Pararius and return a list of listing dicts.
 
@@ -132,7 +122,7 @@ def scrape_listings(
     """
     own_session = session is None
     if own_session:
-        session = requests.Session()
+        session = Session(impersonate="chrome124")
 
     try:
         for attempt in range(1, max_retries + 1):
@@ -142,7 +132,7 @@ def scrape_listings(
                 listings = _parse_listings(html)
                 logger.info("Scraped %d listing(s).", len(listings))
                 return listings
-            except (requests.RequestException, Exception) as exc:
+            except Exception as exc:
                 logger.warning("Attempt %d failed: %s", attempt, exc)
                 if attempt < max_retries:
                     sleep_time = backoff_base ** attempt
