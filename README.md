@@ -1,106 +1,130 @@
-# Automation Workflow Builder
+# ping-rent
 
-A Claude Code template for building automation workflows step by step. It provides a structured command set that guides you — and the AI — through the full lifecycle: from project setup to a standalone, deployable workflow.
-
----
-
-## Prerequisites
-
-- [Claude Code](https://claude.ai/code) installed and running in this directory
+Monitor **Pararius.com** and **Kamernet.nl** for new apartment listings and receive instant Telegram notifications via CallMeBot whenever a new listing appears.
 
 ---
 
-## How to start a new project
+## How it works
 
-Run this command once, at the beginning of every new workflow project:
+The workflow polls both rental platforms on a configurable interval. On the first cycle it silently seeds the seen-listings store (no notifications sent). From cycle 2 onward, any listing not previously seen triggers a Telegram message labeled `[Pararius]` or `[Kamernet]`.
 
+---
+
+## Quick start
+
+### 1. Install dependencies
+
+```bash
+# macOS / Linux
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Windows
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
 ```
-/new-workflow
+
+### 2. Configure environment
+
+Copy `.env.example` to `.env` and fill in your values:
+
+```bash
+cp .env.example .env
 ```
 
-This sets up the file structure, initializes git, creates the state file, and collects all project information in a single session.
-
----
-
-## Command sequence
-
-Each command corresponds to one phase of the development lifecycle. Run them in order.
-
-| Step | Command | What happens |
+| Variable | Required | Description |
 |---|---|---|
-| 1 | `/new-workflow` | Creates file structure, git repo, and collects project definition |
-| 2 | `/plan` | Produces a structured workflow plan for your review and approval |
-| 3 | `/develop` | Implements nodes, tests, and orchestrator from the approved plan |
-| 4 | `/run-workflow` | Executes the workflow end-to-end with an auto-fix loop |
-| 5 | `/deploy` | Packages the workflow into a standalone, agent-independent unit |
+| `PARARIUS_SEARCH_URL` | Yes | Pararius search URL with your filters (city, max rent, rooms, etc.) |
+| `KAMERNET_SEARCH_URL` | Yes | Kamernet search URL with your filters |
+| `CALLMEBOT_TELEGRAM_USERNAME` | Yes | Telegram `@username`(s), comma-separated for multiple recipients |
+| `POLL_INTERVAL_SECONDS` | No | How often to check both sites (default: `300` = 5 minutes) |
+| `NOTIFICATION_DELAY_SECONDS` | No | Delay between successive Telegram messages (default: `2`) |
 
-Each command stops and waits for your instruction before the next phase begins. **You decide when to advance.**
+**Telegram setup (one-time per recipient):** Each recipient must open Telegram, search for `@CallMeBot_txtbot`, and send `/start`.
 
-The only mandatory gate is `/plan` — the AI will not proceed to `/develop` without your explicit approval of the plan.
+### 3. Run
+
+```bash
+# macOS / Linux
+python run.py
+
+# Windows
+python run.py
+```
+
+Press `Ctrl-C` to stop.
 
 ---
 
-## Changing the project description
+## Expected output
 
-When you need to add a feature, modify one, drop scope, or change a constraint after planning has started, run:
+| File | Description |
+|---|---|
+| `outputs/seen_listings_pararius.json` | Sorted list of Pararius URLs already notified — prevents duplicate alerts |
+| `outputs/seen_listings_kamernet.json` | Sorted list of Kamernet URLs already notified |
 
-```
-/re-design
-```
-
-This shows you the current description, captures your change, updates the state file (and any populated description), and records a delta. It then stops and tells you to run `/plan` again. The re-run produces a **delta plan** that keeps unaffected nodes and rebuilds only what changed — then `/develop` rebuilds the affected nodes.
-
----
-
-## Resuming a session
-
-Claude Code has no memory between sessions. At the start of every new session, run:
+On each cycle the orchestrator logs progress to stdout:
 
 ```
-/resume
-```
-
-This reads the state file, inspects the filesystem, identifies where you left off, and tells you exactly which command to run next.
-
----
-
-## Saving progress mid-session
-
-Run at any point to update the state file and validate the current code:
-
-```
-/checkpoint
-```
-
-Use it after fixing a bug, completing a node, or before a complex operation.
-
----
-
-## File structure of a built project
-
-Once `/new-workflow` runs, your project will have this layout:
-
-```
-nodes/                   # Workflow steps (one script per node)
-tests/                   # Unit tests for each node
-workflows/               # Workflow definition (.md file)
-outputs/                 # Files produced by the workflow
-.tmp/                    # Intermediate files during execution
-orchestrator.py/.ts/.js  # Routes between nodes — no business logic
-requirements.txt         # Python dependencies (Python projects)
-package.json             # JS/TS dependencies and scripts (JavaScript/TypeScript projects)
-run.py/.js/.sh/.bat      # Standalone entrypoint — runs without the agent
-.env                     # API keys and secrets (never committed)
-.env.example             # Placeholder template of required variables (committed)
-credentials.json, token.json  # Google OAuth, if used (never committed)
-state_<project-name>.md  # Session state — source of truth across sessions
+2026-06-15 10:00:00  INFO      orchestrator — === Cycle 2 ===
+2026-06-15 10:00:03  INFO      orchestrator — [Pararius] No new listings this cycle.
+2026-06-15 10:00:07  INFO      orchestrator — [Kamernet] No new listings this cycle.
+2026-06-15 10:00:07  INFO      orchestrator — Cycle 2 complete — new=0 notified=0 errors=0
+2026-06-15 10:00:07  INFO      orchestrator — Sleeping 300s until next cycle…
 ```
 
 ---
 
-## Key rules
+## Run tests
 
-- **Never hardcode secrets** — all credentials go in `.env`
-- **The state file is ground truth** — the AI reconstructs all context from it
-- **Workflow definition files** (`workflows/*.md`) are not modified without your approval
-- **`/run-workflow` state updates require your approval** before being persisted — a run may partially succeed and need iteration first
+```bash
+pytest tests/ -v
+```
+
+54 tests — all passing.
+
+---
+
+## Portability notes
+
+- **Python**: requires Python 3.9+
+- **HTTP client**: `curl-cffi` with Chrome 124 TLS impersonation — handles bot detection on both sites without Playwright
+- **No browser required**: fully headless, no Selenium/Playwright dependency
+- **Windows**: works; `curl-cffi` resolves TLS fingerprinting issues that block the standard `requests` library
+- **VPS / cron**: designed to run continuously as a background process; wrap with `nohup` or a systemd service, or schedule with cron (see below)
+
+### Running as a background process (macOS / Linux)
+
+```bash
+nohup python run.py > ping-rent.log 2>&1 &
+```
+
+### Running as a cron job (every 5 minutes, no internal sleep)
+
+If you prefer cron over the built-in poll loop, set `POLL_INTERVAL_SECONDS=0` and add to crontab:
+
+```
+*/5 * * * * cd /path/to/ping-rent && venv/bin/python run.py
+```
+
+### Docker (optional)
+
+A minimal Dockerfile is straightforward since there are no system dependencies beyond Python 3.9+:
+
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "run.py"]
+```
+
+Build and run:
+
+```bash
+docker build -t ping-rent .
+docker run --env-file .env ping-rent
+```

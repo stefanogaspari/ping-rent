@@ -44,6 +44,18 @@ class TestBuildMessage:
         msg = _build_message({})
         assert "New listing" in msg
 
+    def test_pararius_source_label(self):
+        msg = _build_message({**LISTING, "source": "Pararius"})
+        assert "[Pararius]" in msg
+
+    def test_kamernet_source_label(self):
+        msg = _build_message({**LISTING, "source": "Kamernet"})
+        assert "[Kamernet]" in msg
+
+    def test_no_source_no_label(self):
+        msg = _build_message(LISTING)
+        assert "[" not in msg.split("\n")[0]  # no label bracket in the first line
+
 
 class TestSendNotification:
     def test_empty_listings_returns_empty(self):

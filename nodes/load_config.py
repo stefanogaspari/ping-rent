@@ -10,6 +10,7 @@ Input:
 Output:
     dict with keys:
         search_url (str)               — Pararius search URL with all filters encoded
+        kamernet_search_url (str)      — Kamernet search URL with all filters encoded
         callmebot_recipients (list)    — list of Telegram @usernames (API key = username)
         poll_interval (int)            — seconds between scrape cycles (default 300)
         notification_delay (float)     — seconds between Telegram messages (default 2)
@@ -24,7 +25,7 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-REQUIRED_KEYS = ("PARARIUS_SEARCH_URL", "CALLMEBOT_TELEGRAM_USERNAME")
+REQUIRED_KEYS = ("PARARIUS_SEARCH_URL", "KAMERNET_SEARCH_URL", "CALLMEBOT_TELEGRAM_USERNAME")
 
 
 def load_config(env_path: str = ".env") -> dict:
@@ -53,14 +54,16 @@ def load_config(env_path: str = ".env") -> dict:
 
     config = {
         "search_url": os.environ["PARARIUS_SEARCH_URL"].strip(),
+        "kamernet_search_url": os.environ["KAMERNET_SEARCH_URL"].strip(),
         "callmebot_recipients": recipients,
         "poll_interval": int(os.environ.get("POLL_INTERVAL_SECONDS", "300")),
         "notification_delay": float(os.environ.get("NOTIFICATION_DELAY_SECONDS", "2")),
     }
 
     logger.info(
-        "Config loaded — search_url=%s poll_interval=%ds recipients=%d",
+        "Config loaded — pararius_url=%s kamernet_url=%s poll_interval=%ds recipients=%d",
         config["search_url"],
+        config["kamernet_search_url"],
         config["poll_interval"],
         len(config["callmebot_recipients"]),
     )

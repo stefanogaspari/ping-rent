@@ -3,7 +3,7 @@
 Usage:
     python run.py
 
-The orchestrator polls Pararius indefinitely (Ctrl-C to stop).
+The orchestrator polls Pararius and Kamernet indefinitely (Ctrl-C to stop).
 """
 
 import sys

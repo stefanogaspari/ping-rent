@@ -38,7 +38,9 @@ CALLMEBOT_ENDPOINT = "https://api.callmebot.com/text.php"
 
 def _build_message(listing: dict) -> str:
     """Format a listing dict into a human-readable Telegram message."""
-    parts = ["🏠 New listing on Pararius!"]
+    source = listing.get("source", "")
+    label = f"[{source}] " if source else ""
+    parts = [f"🏠 {label}New listing!"]
     if listing.get("title"):
         parts.append(f"📍 {listing['title']}")
     if listing.get("location"):
