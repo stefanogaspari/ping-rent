@@ -6,6 +6,8 @@ Monitor pararius.com for new apartment listings matching configurable search cri
 ## Current Status
 **Deployed.** All 6 nodes implemented, orchestrator written, 39 unit tests passing (39/39). Cold-start cycle executed successfully — 30 listings seeded in `outputs/seen_listings.json`. Standalone entrypoint `run.py` created, `requirements.txt` fully pinned, `.env.example` updated, `README.md` written. Workflow runs without the agent via `python run.py`.
 
+**Latest change (2026-06-13):** Replaced `requests` with `curl-cffi` in `scrape_listings.py` to fix Windows bot detection (Pararius blocked Python `requests` on Windows due to TLS fingerprint mismatch). `curl_cffi` impersonates Chrome 124's TLS handshake cross-platform.
+
 ## Data Schema
 - **Seen listings store**: JSON file (`outputs/seen_listings.json`) — sorted list of listing URLs already notified
 - **Listing object** (scraped from Pararius): `{ url, title, price, location, rooms, surface }`
@@ -40,9 +42,10 @@ Monitor pararius.com for new apartment listings matching configurable search cri
 - **Atomic write**: `tempfile.mkstemp` + `os.replace` for seen store — prevents data loss on crash mid-write.
 - **Session injection**: All HTTP-touching nodes accept an optional `session` parameter, enabling clean mocking in tests without patching globals.
 - **Scraper deduplication**: `_parse_listings` deduplicates by URL before returning — Pararius HTML contains both `li.search-list__item--listing` and a nested `section.listing-search-item` per card, causing each listing to match the CSS selector twice.
+- **HTTP client**: switched from `requests` to `curl-cffi` (`Session(impersonate="chrome124")`) — resolves Windows-specific TLS fingerprint bot detection by Pararius.
 
 ## Known Issues
-- Pararius may block automated scraping (rate limiting, CAPTCHAs, JS rendering). `requests` + `BeautifulSoup` used first; `playwright` fallback documented in workflow if needed. First attempt gets a 403 ~50% of the time; retry on attempt 2 succeeds.
+- Pararius may block automated scraping (rate limiting, CAPTCHAs, JS rendering). `curl_cffi` (Chrome 124 impersonation) + `BeautifulSoup` used; `playwright` fallback documented in workflow if needed. Windows 403 blocking resolved by the `curl-cffi` switch.
 - Pararius HTML structure changes will break the CSS selectors in `scrape_listings.py`; the node logs a warning and returns an empty list rather than crashing.
 - CallMeBot Telegram rate limiting mitigated by `NOTIFICATION_DELAY_SECONDS` (default 2s) between messages.
 
@@ -56,12 +59,13 @@ nodes/
   load_config.py          — load_config(env_path) → dict (uses CALLMEBOT_TELEGRAM_USERNAME)
   load_seen_listings.py   — load_seen_listings(store_path) → set
   scrape_listings.py      — scrape_listings(search_url, ..., session) → list[dict] (URL-deduplicated)
+                            Uses curl_cffi.requests.Session(impersonate="chrome124") for HTTP
   diff_listings.py        — diff_listings(scraped, seen) → list[dict]
   send_notification.py    — send_notification(new_listings, user, api_key, ...) → list[dict]
   update_seen_listings.py — update_seen_listings(new_listings, seen, store_path) → set
 orchestrator.py           — main() poll loop; run_once(config, is_cold_start) → stats dict
 run.py                    — standalone entrypoint (calls orchestrator.main())
-requirements.txt          — all deps pinned (runtime + dev)
+requirements.txt          — all deps pinned (runtime + dev); curl-cffi replaces requests
 .env.example              — variable template with descriptive placeholders
 README.md                 — setup, run, background-process, portability docs
 outputs/seen_listings.json — 30 URLs seeded (Rotterdam search, 2026-06-10)
