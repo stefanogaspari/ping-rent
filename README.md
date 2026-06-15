@@ -1,167 +1,106 @@
-# ping-rent
+# Automation Workflow Builder
 
-Polls [Pararius.com](https://www.pararius.com) for new apartment listings matching your search criteria and sends a Telegram notification via [CallMeBot](https://www.callmebot.com/blog/free-telegram-messages-api/) whenever a new listing appears.
-
----
-
-## How it works
-
-1. **Load config** — reads `.env`
-2. **Load seen listings** — reads `outputs/seen_listings.json` (created on first run)
-3. **Scrape Pararius** — HTTP GET on your search URL, parse listing cards
-4. **Diff** — identify listings not yet seen
-5. **Notify** — send one Telegram message per new listing via CallMeBot
-6. **Update store** — write new URLs back to `outputs/seen_listings.json`
-7. **Sleep** — wait `POLL_INTERVAL_SECONDS`, then repeat
-
-**Cold-start behaviour:** the very first cycle seeds the seen store silently — no notifications are sent. Notifications begin from the second cycle onward, avoiding first-run spam.
+A Claude Code template for building automation workflows step by step. It provides a structured command set that guides you — and the AI — through the full lifecycle: from project setup to a standalone, deployable workflow.
 
 ---
 
-## Requirements
+## Prerequisites
 
-- Python 3.9+
-- A [CallMeBot Telegram](https://www.callmebot.com/blog/free-telegram-messages-api/) account (free)
-  - Start a chat with `@CallMeBot_txtbot` on Telegram and send `/start`
+- [Claude Code](https://claude.ai/code) installed and running in this directory
 
 ---
 
-## Setup
+## How to start a new project
 
-### 1. Install dependencies
+Run this command once, at the beginning of every new workflow project:
 
-```bash
-# macOS / Linux
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+```
+/new-workflow
 ```
 
-```bat
-:: Windows
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-```
+This sets up the file structure, initializes git, creates the state file, and collects all project information in a single session.
 
-### 2. Configure environment variables
+---
 
-```bash
-cp .env.example .env
-```
+## Command sequence
 
-Open `.env` and fill in the values:
+Each command corresponds to one phase of the development lifecycle. Run them in order.
 
-| Variable | Required | Description |
+| Step | Command | What happens |
 |---|---|---|
-| `PARARIUS_SEARCH_URL` | Yes | Full Pararius search URL with all filters (city, max rent, min rooms, etc.) |
-| `CALLMEBOT_TELEGRAM_USERNAME` | Yes | Your Telegram `@username` (or comma-separated list for multiple recipients) |
-| `POLL_INTERVAL_SECONDS` | No | How often to check for new listings, in seconds. Default: `300` (5 min) |
-| `NOTIFICATION_DELAY_SECONDS` | No | Delay between successive Telegram messages. Default: `2` |
+| 1 | `/new-workflow` | Creates file structure, git repo, and collects project definition |
+| 2 | `/plan` | Produces a structured workflow plan for your review and approval |
+| 3 | `/develop` | Implements nodes, tests, and orchestrator from the approved plan |
+| 4 | `/run-workflow` | Executes the workflow end-to-end with an auto-fix loop |
+| 5 | `/deploy` | Packages the workflow into a standalone, agent-independent unit |
 
-**Example `.env`:**
+Each command stops and waits for your instruction before the next phase begins. **You decide when to advance.**
+
+The only mandatory gate is `/plan` — the AI will not proceed to `/develop` without your explicit approval of the plan.
+
+---
+
+## Changing the project description
+
+When you need to add a feature, modify one, drop scope, or change a constraint after planning has started, run:
+
 ```
-PARARIUS_SEARCH_URL=https://www.pararius.com/apartments/rotterdam/0-1500/2-bedrooms
-CALLMEBOT_TELEGRAM_USERNAME=@johndoe
-POLL_INTERVAL_SECONDS=300
-NOTIFICATION_DELAY_SECONDS=2
+/re-design
+```
+
+This shows you the current description, captures your change, updates the state file (and any populated description), and records a delta. It then stops and tells you to run `/plan` again. The re-run produces a **delta plan** that keeps unaffected nodes and rebuilds only what changed — then `/develop` rebuilds the affected nodes.
+
+---
+
+## Resuming a session
+
+Claude Code has no memory between sessions. At the start of every new session, run:
+
+```
+/resume
+```
+
+This reads the state file, inspects the filesystem, identifies where you left off, and tells you exactly which command to run next.
+
+---
+
+## Saving progress mid-session
+
+Run at any point to update the state file and validate the current code:
+
+```
+/checkpoint
+```
+
+Use it after fixing a bug, completing a node, or before a complex operation.
+
+---
+
+## File structure of a built project
+
+Once `/new-workflow` runs, your project will have this layout:
+
+```
+nodes/                   # Workflow steps (one script per node)
+tests/                   # Unit tests for each node
+workflows/               # Workflow definition (.md file)
+outputs/                 # Files produced by the workflow
+.tmp/                    # Intermediate files during execution
+orchestrator.py/.ts/.js  # Routes between nodes — no business logic
+requirements.txt         # Python dependencies (Python projects)
+package.json             # JS/TS dependencies and scripts (JavaScript/TypeScript projects)
+run.py/.js/.sh/.bat      # Standalone entrypoint — runs without the agent
+.env                     # API keys and secrets (never committed)
+.env.example             # Placeholder template of required variables (committed)
+credentials.json, token.json  # Google OAuth, if used (never committed)
+state_<project-name>.md  # Session state — source of truth across sessions
 ```
 
 ---
 
-## Run
+## Key rules
 
-```bash
-# macOS / Linux
-source venv/bin/activate
-python run.py
-```
-
-```bat
-:: Windows
-venv\Scripts\activate
-python run.py
-```
-
-The workflow runs indefinitely. Press `Ctrl-C` to stop.
-
----
-
-## Expected output
-
-- **Console logs** — one line per cycle showing new listing count, notifications sent, and any errors
-- **`outputs/seen_listings.json`** — running list of all URLs that have already been notified (grows over time; safe to delete to reset the seen store)
-
----
-
-## Running as a background process
-
-### macOS — launchd
-
-Create `~/Library/LaunchAgents/com.ping-rent.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>          <string>com.ping-rent</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/path/to/ping-rent/venv/bin/python</string>
-    <string>/path/to/ping-rent/run.py</string>
-  </array>
-  <key>WorkingDirectory</key> <string>/path/to/ping-rent</string>
-  <key>RunAtLoad</key>        <true/>
-  <key>KeepAlive</key>        <true/>
-  <key>StandardOutPath</key>  <string>/tmp/ping-rent.log</string>
-  <key>StandardErrorPath</key><string>/tmp/ping-rent.log</string>
-</dict>
-</plist>
-```
-
-```bash
-launchctl load ~/Library/LaunchAgents/com.ping-rent.plist
-```
-
-### Linux / VPS — systemd
-
-Create `/etc/systemd/system/ping-rent.service`:
-
-```ini
-[Unit]
-Description=ping-rent Pararius monitor
-
-[Service]
-WorkingDirectory=/path/to/ping-rent
-ExecStart=/path/to/ping-rent/venv/bin/python run.py
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl enable --now ping-rent
-```
-
----
-
-## Portability notes
-
-- **Python version**: developed and tested on Python 3.14; any Python 3.9+ should work.
-- **OS**: macOS and Linux tested. Windows supported via the `venv\Scripts\activate` path.
-- **No database**: state is stored in `outputs/seen_listings.json` — a plain JSON file. Back it up if you care about not re-notifying old listings after a machine migration.
-- **Pararius scraping**: uses `requests` + `BeautifulSoup`. A `playwright` fallback is documented in `workflows/ping-rent.md` if Pararius starts serving JS-rendered pages. First requests to Pararius may occasionally return 403; the workflow retries automatically (3 attempts, exponential backoff).
-
----
-
-## Running tests
-
-```bash
-source venv/bin/activate   # or venv\Scripts\activate on Windows
-python -m pytest tests/ -v
-```
-
-39 unit tests, all passing. No network calls made during tests.
+- **Never hardcode secrets** — all credentials go in `.env`
+- **The state file is ground truth** — the AI reconstructs all context from it
+- **Workflow definition files** (`workflows/*.md`) are not modified without your approval
+- **`/run-workflow` state updates require your approval** before being persisted — a run may partially succeed and need iteration first

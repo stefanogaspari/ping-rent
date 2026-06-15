@@ -11,6 +11,15 @@
 2. Locate the state file in the project root by matching the pattern `state_*.md` and read its contents.
 3. Based on its content, describe the characteristics of the automation workflow required to produce the expected output.
 
+### Re-Plan Mode (after `/re-design`)
+
+If a workflow definition already exists in `workflows/` AND the state file records a re-design delta (see `/re-design`), plan **incrementally** rather than from scratch:
+
+- Read the existing workflow definition and the re-design delta.
+- Produce a **delta plan**: for each step/node, mark it **Keep** (unaffected), **Modify**, **Add**, or **Remove**.
+- Preserve unaffected nodes — do not re-specify or rebuild them.
+- In each section below, focus on what the change touches; note unchanged areas briefly as "unchanged".
+
 ### Section 1 — Workflow Overview
 
 - What is the **name** and **purpose** of the workflow?

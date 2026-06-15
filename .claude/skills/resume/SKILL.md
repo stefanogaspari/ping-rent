@@ -58,6 +58,8 @@ Based on state file content and filesystem evidence, identify which phase the pr
 | Files in `outputs/`, no `run.*` entrypoint | Run successful | `/deploy` |
 | `run.*` entrypoint exists | Deployed | Workflow complete |
 
+**Re-design override:** if the state file records a re-design delta (see `/re-design`) that has not yet been re-planned — i.e. the project description changed after the last plan and the **Next Steps** field calls for `/plan` — set the phase to **Re-design pending** with next command `/plan`, regardless of the filesystem-derived phase above. A delta plan must run before any further `/develop`, `/run-workflow`, or `/deploy`.
+
 If discrepancies exist between the state file and the filesystem, flag the phase as **inconsistent** and describe what needs to be reconciled before proceeding.
 
 ### Step 6 — Present the session summary
